@@ -234,7 +234,10 @@ class MachineState(nixops.resources.ResourceState):
             outfile = destDir + "/" + k
             outfile_esc = "'" + outfile.replace("'", r"'\''") + "'"
             self.run_command("rm -f " + outfile_esc)
-            self.upload_file(tmp, outfile)
+            # For some unknown reason, if I use a master connection, only
+            # the first key is sent. Other keys are silently not sent and I get
+            # no error output.
+            self.upload_file(tmp, outfile, useMasterConnection=False)
             self.run_command(
               ' '.join([
                 # chown only if user and group exist,
@@ -376,9 +379,13 @@ class MachineState(nixops.resources.ResourceState):
         if res != 0: raise Exception("unable to upload VPN key to ‘{0}’".format(self.name))
         self.public_vpn_key = public
 
-    def upload_file(self, source, target, recursive=False):
-        master = self.ssh.get_master()
-        cmdline = ["scp"] + self.get_ssh_flags(True) + master.opts
+    def upload_file(self, source, target, recursive=False, useMasterConnection=True):
+        if useMasterConnection:
+            master = self.ssh.get_master()
+        else:
+            master = []
+
+        cmdline = ["scp"] + self.get_ssh_flags(True)# + master.opts
         if recursive:
             cmdline += ['-r']
         cmdline += [source, "root@" + self.get_ssh_name() + ":" + target]
